@@ -10,11 +10,13 @@ app.use(cors());
 const user = require("./routes/user_auth_routes");
 const membershipRoute = require("./routes/membership_routes");
 const itemRoute = require("./routes/item_routes");
+const issueRoute = require("./routes/issue_routes");
 
 
 app.use("/api/v1", user);
 app.use("/api/v1",membershipRoute);
 app.use("/api/v1",itemRoute);
+app.use("/api/v1",issueRoute);
 
 app.get("/", (req, res) => {
 	try {
@@ -22,7 +24,6 @@ app.get("/", (req, res) => {
 			message: "Welcome to the API",
 			success: true,
 		});
-		// throw 10
 	} catch (err) {
 		res.status(500).json({
 			message: "Internal Server Error",

@@ -1,4 +1,4 @@
-import { createContext, useState } from "react";
+import React, { createContext, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CookiesProvider, useCookies } from "react-cookie";
 import axios from "axios";
@@ -9,6 +9,11 @@ function AppContextProvider({ children }) {
 	const [loading, setLoading] = useState(false);
 	// const [user, setUser] = useState({});
 	const [isAdmin, setIsAdmin] = useState(false);
+	const [items, setItems] = useState([]);
+	const [masterMemberships,setMasterMemberships] = useState([]);
+	const [issueRequests,setIssueRequests] = useState([]);
+	const [activeIssues,setActiveIssues] = useState([]);
+	const [overdue,setOverDue] = useState([]);
 	const navigate = useNavigate();
 	const BASE_URL = "http://localhost:5500/api/v1";
 	const [cookies, setCookie, removeCookie] = useCookies();
@@ -19,20 +24,18 @@ function AppContextProvider({ children }) {
 		try {
 			const response = await axios.post(`${BASE_URL}/login`, data);
 			console.log("Login successful:", response.data);
-
-			setUser(response.data.exisitingUser);
 			setCookie("token", response.data.token, { path: "/" });
 
 			if (response.data.exisitingUser.role === "admin") {
 				setIsAdmin(true);
-				alert("Login Success");
+				setCookie("adm", true, { path: "/" });
 
 				// navigate("/adminHomePage");
 			} else if (response.data.exisitingUser.role === "user") {
 				// navigate("/userHomePage");
 			}
 
-			// navigate("/dashboard");
+			navigate("/dashboard");
 		} catch (err) {
 			console.log("Login error:", err.response?.data || err.message);
 			alert(err.response?.data.message);
@@ -41,134 +44,232 @@ function AppContextProvider({ children }) {
 		}
 	}
 
-	// async function handleRegister(data) {
-	// 	setLoading(true);
-	// 	try {
-	// 		data.role = "User";
-	// 		const response = await axios.post(`${BASE_URL}/register`, data);
-	// 		console.log("Register:", response);
+	async function handleLogout() {
+		removeCookie("token");
+		removeCookie("adm");
+		navigate("/");
+	}
 
-	// 		navigate("/login");
-	// 	} catch (err) {
-	// 		console.error("Register error:", err.response?.data || err.message);
-	// 	} finally {
-	// 		setLoading(false);
-	// 	}
-	// }
+	//Reports
+	const getHomeData = async () => {
+		setLoading(true);
+		try {
+			const response = await axios.get(`${BASE_URL}/getAllItemByType`);
+			if (response.data.success) {
+				const fetchedItems = response.data.data.map((item) => ({
+					itemId: item.bid,
+					itemType: item.itemType,
+					name: item.name,
+					author: item.authorName || "N/A",
+					category: item.category,
+					status: item.availability ? "Available" : "Issued",
+					cost: `$${item.cost.toFixed(2)}`,
+					procurementDate: new Date(item.dateOfProcurement)
+						.toISOString()
+						.split("T")[0],
+				}));
+				setItems(fetchedItems);
+			}
+		} catch (err) {
+			console.error("Home Page error:", err.response?.data || err.message);
+			alert(err.response?.data.message || "Error fetching items");
+		} finally {
+			setLoading(false);
+		}
+	};
 
-	// function handleLogout() {
-	// 	setLoading(true);
-	// 	try {
-	// 		setUser({});
-	// 		removeCookie("token");
-	// 		removeCookie("user");
-	// 		setIsAdmin(false);
-	// 		navigate("/login");
+	const getMemberships = async() => {
+		setLoading(true);
+		try {
+			const res = await axios.get(`${BASE_URL}/getAllMembership`);
+			if(res.data.success) {
+				const memberships =  res.data.data.map((item) => ({
+					id: item.membershipId,
+					name: `${item.firstName} ${item.secondName}`,
+					contactNumber: item.contactNo,
+					address: item.contactAddress,
+					startDate: new Date(item.startDate).toISOString().split("T")[0],
+					endDate: new Date(item.endDate).toISOString().split("T")[0],
+					amountPending: item.amountPending,
+					status: item.status,
+				}));
+				setMasterMemberships(memberships);
+			}
 
-	// 		console.log("User logged out successfully");
-	// 	} catch (err) {
-	// 		console.error("Logout error:", err);
-	// 	} finally {
-	// 		setLoading(false);
-	// 	}
-	// }
+		}catch (err) {
+			console.error("Error in fetching Membership:", err.response?.data || err.message);
+			alert(err.response?.data.message || "Error fetching items");
+		} finally {
+			setLoading(false);
+		}
+	}
 
-	// async function getAllCars() {
-	// 	setLoading(true);
-	// 	try {
-	// 		const res = await axios.get(`${BASE_URL}/getallcars`);
-	// 		setCars(res.data);
-	// 		// console.log(res);
-	// 	} catch (err) {
-	// 		console.error("Error getting cars data", err);
-	// 	} finally {
-	// 		setLoading(false);
-	// 	}
-	// }
+	const getIssueReuest = async() => {
+		setLoading(true);
+		try {
+			const res = await axios.get(`${BASE_URL}/requestIssue`);
+			if(res.data.success) {
+				const requests =  res.data.data.map((item) => ({
+					id: item.issueId,
+					name: item.nameOfItem,
+					requestedDate: new Date(item.requestedDate).toISOString().split("T")[0],
+					requestFullfiled: item.requestFulfilled,
+				}));
+				setIssueRequests(requests);
+			}
 
-	// async function addCar(carData) {
-	// 	try {
-	// 		carData.capacity = Number(carData.capacity);
-	// 		carData.rentPerHour = Number(carData.rentPerHour);
-	// 		const response = await axios.post(`${BASE_URL}/addCar`, carData);
-	// 		console.log(response);
+		}catch (err) {
+			console.error("Error in fetching Issue Request:", err.response?.data || err.message);
+			alert(err.response?.data.message || "Error fetching items");
+		} finally {
+			setLoading(false);
+		}
+	}
 
-	// 		if (response.statusText === "OK") {
-	// 			return response;
-	// 		} else {
-	// 			console.error("Failed to add car.");
-	// 		}
-	// 	} catch (error) {
-	// 		console.error("Error:", error);
-	// 	}
-	// }
-	// async function editCar(carData) {
-	// 	console.log(carData);
+	const getActiveIssue = async() => {
+		setLoading(true);
+		try {
+			const res = await axios.get(`${BASE_URL}/activeIssue`);
+			if(res.data.success) {
+				const active =  res.data.data.map((item) => ({
+					id: item.issueId,
+					name: item.nameOfItem,
+					itemId: item.bookId,
+					dateOfIssue: new Date(item.dateOfIssue).toISOString().split("T")[0],
+					dateOfReturn: new Date(item.dateOfReturn).toISOString().split("T")[0],
+					
+				}));
+				setActiveIssues(active);
+			}
 
-	// 	try {
-	// 		carData.capacity = Number(carData.capacity);
-	// 		carData.rentPerHour = Number(carData.rentPerHour);
-	// 		const response = await axios.post(`${BASE_URL}/editcar`, carData);
+		}catch (err) {
+			console.error("Error in fetching Active Issue:", err.response?.data || err.message);
+			alert(err.response?.data.message || "Error fetching items");
+		} finally {
+			setLoading(false);
+		}
+	}
 
-	// 		if (response.status === 200) {
-	// 			return response;
-	// 		} else {
-	// 			console.error("Failed to edir car.");
-	// 		}
-	// 	} catch (error) {
-	// 		console.error("Error:", error);
-	// 	}
-	// }
-	// async function makeBooking(bookingData) {
-	// 	console.log(bookingData);
-	// 	setLoading(true);
-	// 	try {
-	// 		const res = await axios.post(`${BASE_URL}/bookCar`, bookingData);
-	// 		setCars(res.data);
-	// 		console.log(res);
-	// 	} catch (err) {
-	// 		console.error("Error getting cars data", err);
-	// 	} finally {
-	// 		setLoading(false);
-	// 	}
-	// }
-	// async function getAllBookings() {
-	// 	setLoading(true);
-	// 	try {
-	// 		const res = await axios.get(`${BASE_URL}/getAllBookings`);
-	// 		setBookings(res.data);
-	// 	} catch (err) {
-	// 		console.error("Error getting booking data", err);
-	// 	} finally {
-	// 		setLoading(false);
-	// 	}
-	// }
+	const getOverDue = async() => {
+		setLoading(true);
+		try {
+			const res = await axios.get(`${BASE_URL}/overdueIssue`);
+			if(res.data.success) {
+				const overdue =  res.data.data.map((item) => ({
+					id: item.issueId,
+					name: item.nameOfItem,
+					itemId: item.bookId,
+					dateOfIssue: new Date(item.dateOfIssue).toISOString().split("T")[0],
+					dateOfReturn: new Date(item.dateOfReturn).toISOString().split("T")[0],
+					fine: item.fineAmount,
+					finePaid: item.finePaid
+				}));
+				setOverDue(overdue);
+			}
 
-	// const value = {
-	// 	loading,
-	// 	setLoading,
-	// 	user,
-	// 	setUser,
-	// 	isAdmin,
-	// 	setIsAdmin,
-	// 	navigate,
-	// 	handleLogin,
-	// 	handleRegister,
-	// 	handleLogout,
-	// 	cars,
-	// 	setCars,
-	// 	getAllCars,
-	// 	cookies,
-	// 	setCookie,
-	// 	removeCookie,
-	// 	addCar,
-	// 	makeBooking,
-	// 	getAllBookings,
-	// 	bookings,
-	// 	setBookings,
-	// 	editCar,
-	// };
-	const value = { loading, setLoading, isAdmin, setIsAdmin, navigate, cookies };
+		}catch (err) {
+			console.error("Error in fetching Active Issue:", err.response?.data || err.message);
+			alert(err.response?.data.message || "Error fetching items");
+		} finally {
+			setLoading(false);
+		}
+	}
+	//maintaince
+	const addUser = async (data) => {
+		console.log(data);
+		setLoading(true);
+		try {
+			data.token = cookies.token;
+			const response = await axios.post(`${BASE_URL}/addUser`, data);
+			if (response.data.success === "success") {
+				alert(`User succesfully added: ${response.data.user.uid}`);
+			}
+		} catch (err) {
+			console.error(err);
+			alert(err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const updateUser = async (data) => {
+		console.log(data);
+
+		setLoading(true);
+		try {
+			data.token = cookies.token;
+			const response = await axios.put(`${BASE_URL}/updateUser`, data);
+			if (response.data.success === "success") {
+				alert(`User updated succesfully: ${response.data.user.uid}`);
+			}
+		} catch (err) {
+			console.error(err);
+			alert(err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const addMembership = async (data) => {
+		console.log(data);
+		setLoading(true);
+		try {
+			data.token = cookies.token;
+			const response = await axios.post(`${BASE_URL}/addMembership`, data);
+			if (response.data.success === "success") {
+				alert(
+					`Membership succesfully added: ${response.data.data.membershipId}`
+				);
+			}
+		} catch (err) {
+			console.error(err);
+			alert(err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const updateMembership = async (data) => {
+		console.log(data);
+
+		setLoading(true);
+		try {
+			data.token = cookies.token;
+			const response = await axios.put(`${BASE_URL}/updateMembership`, data);
+			if (response.data.success === "success") {
+				alert(
+					`Membership updated succesfully: ${response.data.data.membershipId}`
+				);
+			}
+		} catch (err) {
+			console.error(err);
+			alert(err);
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	const value = {
+		loading,
+		BASE_URL,
+		setLoading,
+		isAdmin,
+		setIsAdmin,
+		navigate,
+		cookies,
+		items,
+		setItems,
+		handleLogin,
+		getHomeData,
+		handleLogout,
+		addUser,
+		updateUser,
+		masterMemberships,setMasterMemberships,getMemberships,
+		activeIssues,setActiveIssues,getActiveIssue,
+		overdue,setOverDue,getOverDue,
+		issueRequests,setIssueRequests,getIssueReuest,
+	};
+
 	return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
 }
 export default AppContextProvider;
